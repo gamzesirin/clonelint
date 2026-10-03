@@ -12,8 +12,15 @@ function installedVersion(commands) {
   return null;
 }
 
-function toolVersions(ctx, tool) {
-  return ctx.read('.tool-versions')?.match(new RegExp(`^${tool}\\s+(\\S+)`, 'm'))?.[1] ?? null;
+// asdf and mise name some tools differently (nodejs / node, golang / go).
+function toolVersions(ctx, ...tools) {
+  return ctx.read('.tool-versions')?.match(new RegExp(`^(?:${tools.join('|')})[ \\t]+(\\S+)`, 'm'))?.[1] ?? null;
+}
+
+// Poetry's own constraint, used by projects without a PEP 621 requires-python.
+function poetryPython(ctx) {
+  const section = ctx.read('pyproject.toml')?.match(/^\[tool\.poetry\.dependencies\][^\n]*\n((?:(?!\[)[^\n]*(?:\n|$))*)/m)?.[1];
+  return section?.match(/^python\s*=\s*["']([^"']+)["']/m)?.[1];
 }
 
 // A "pin" names one version (.nvmrc); a "range" is a constraint (engines).
@@ -33,7 +40,7 @@ const RUNTIMES = [
       return [
         ...pin(ctx.read('.nvmrc'), '.nvmrc'),
         ...pin(ctx.read('.node-version'), '.node-version'),
-        ...pin(toolVersions(ctx, 'nodejs'), '.tool-versions'),
+        ...pin(toolVersions(ctx, 'nodejs', 'node'), '.tool-versions'),
         ...pin(pkg?.volta?.node, 'package.json volta'),
         ...range(pkg?.engines?.node, 'package.json engines'),
       ];
@@ -51,6 +58,8 @@ const RUNTIMES = [
         ...pin(toolVersions(ctx, 'python'), '.tool-versions'),
         ...pin(ctx.read('runtime.txt')?.replace(/^python-/, ''), 'runtime.txt'),
         ...range(ctx.read('pyproject.toml')?.match(/^\s*requires-python\s*=\s*["']([^"']+)["']/m)?.[1], 'pyproject.toml'),
+        // Poetry reads ~3.10 like npm does (<3.11), unlike PEP 440's ~=3.10.
+        ...range(poetryPython(ctx), 'pyproject.toml tool.poetry').map((req) => ({ ...req, looseTilde: false })),
       ];
     },
     hint: 'Install a matching Python with pyenv, uv (`uv python install`) or from python.org.',
@@ -74,9 +83,9 @@ const RUNTIMES = [
     installed: () => installedVersion(['go version']),
     requirements(ctx) {
       const go = ctx.read('go.mod')?.match(/^go\s+(\d+\.\d+(?:\.\d+)?)/m)?.[1];
-      return range(go && `>=${go}`, 'go.mod');
+      return [...pin(toolVersions(ctx, 'golang', 'go'), '.tool-versions'), ...range(go && `>=${go}`, 'go.mod')];
     },
-    hint: 'Install a newer Go from go.dev/dl.',
+    hint: 'Install a matching Go from go.dev/dl.',
   },
   {
     name: 'Ruby',
@@ -95,7 +104,7 @@ const RUNTIMES = [
 
 function evaluate(runtime, installed, req) {
   const label = `${runtime.name} ${installed}`;
-  const verdict = satisfies(installed, req.spec, { looseTilde: runtime.looseTilde });
+  const verdict = satisfies(installed, req.spec, { looseTilde: req.looseTilde ?? runtime.looseTilde });
   if (verdict === null) {
     return warn(`${label} installed; cannot interpret "${req.spec}" from ${req.source}`);
   }

@@ -6,6 +6,8 @@ import path from 'node:path';
 import net from 'node:net';
 import { applyFixes, diagnose } from '../src/index.js';
 import { parseDotenv } from '../src/dotenv.js';
+import { run } from '../src/exec.js';
+import { parseSs } from '../src/net.js';
 
 function project(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clonelint-'));
@@ -143,4 +145,46 @@ test('loosely typed config values do not crash a check', async () => {
   assert.equal(messages.filter((message) => /crashed/.test(message)).length, 0);
   assert.deepEqual(results(report, 'runtimes').map((r) => r.status), ['fail', 'fail']);
   assert.deepEqual(results(report, 'custom').map((r) => r.status), ['warn', 'warn']);
+});
+
+test('a workspace package takes its package manager from the repository root', async () => {
+  const dir = project({
+    '.git/HEAD': 'ref: refs/heads/main\n',
+    'yarn.lock': '',
+    'packages/app/package.json': { dependencies: { 'clonelint-fake-a': '1.0.0' } },
+  });
+  const found = results(await diagnose(path.join(dir, 'packages/app'), { only: ['dependencies'] }), 'dependencies');
+  // Either yarn is missing on this machine, or the fix installs with it.
+  assert.match(found.map((r) => `${r.message} ${r.fix?.label ?? ''}`).join('\n'), /yarn is not installed|yarn install/);
+  assert.doesNotMatch(found.map((r) => r.fix?.label ?? '').join('\n'), /npm install/);
+});
+
+test('.tool-versions aliases and the Poetry python constraint are read', async () => {
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  const node = await diagnose(project({ '.tool-versions': `node ${major}.${minor}.0\n` }), { only: ['runtimes'] });
+  assert.match(results(node, 'runtimes')[0].message, /\.tool-versions/);
+
+  const go = await diagnose(project({ '.tool-versions': 'golang 1.22.3\n' }), { only: ['runtimes'] });
+  assert.match(results(go, 'runtimes')[0].message, /Go .*(1\.22\.3)/);
+
+  const poetry = project({ 'pyproject.toml': '[tool.poetry.dependencies]\npython = "^3.10"\nrequests = "^2"\n\n[tool.other]\npython = "1"\n' });
+  const [python, ...rest] = results(await diagnose(poetry, { only: ['runtimes'] }), 'runtimes');
+  assert.match(python.message, /\^3\.10/);
+  assert.equal(rest.length, 0);
+});
+
+test('a project-local composer.phar is used when Composer is not on PATH', async (t) => {
+  if (run('composer --version').ok) return t.skip('composer is installed globally');
+  const manifest = { require: { 'vendor/package': '^1.0' } };
+  const [local] = results(await diagnose(project({ 'composer.json': manifest, 'composer.phar': '' }), { only: ['dependencies'] }), 'dependencies');
+  assert.equal(local.fix.label, 'php composer.phar install');
+  const [none] = results(await diagnose(project({ 'composer.json': manifest }), { only: ['dependencies'] }), 'dependencies');
+  assert.equal(none.fix, undefined);
+  assert.match(none.hint, /getcomposer\.org/);
+});
+
+test('parseSs reads the owner of a listening port', () => {
+  assert.deepEqual(parseSs('LISTEN 0 511 *:3000 *:* users:(("node",pid=4821,fd=23))'), { pid: '4821', name: 'node' });
+  assert.equal(parseSs('LISTEN 0 511 *:3000 *:*'), null);
+  assert.equal(parseSs(''), null);
 });

@@ -46,6 +46,13 @@ export function portOwner(port) {
   }
   const out = run(`lsof -nP -iTCP:${port} -sTCP:LISTEN -Fpc`).stdout;
   const pid = out.match(/^p(\d+)/m)?.[1];
-  if (!pid) return null;
-  return { pid, name: out.match(/^c(.+)/m)?.[1] ?? null };
+  if (pid) return { pid, name: out.match(/^c(.+)/m)?.[1] ?? null };
+  // lsof is often not installed on Linux; ss (iproute2) nearly always is.
+  return process.platform === 'linux' ? parseSs(run(`ss -Hltnp "sport = :${port}"`).stdout) : null;
+}
+
+/** Owner from `ss -ltnp` output: ... users:(("node",pid=4821,fd=23)) */
+export function parseSs(output) {
+  const m = output.match(/users:\(\("([^"]*)",pid=(\d+)/);
+  return m ? { pid: m[2], name: m[1] || null } : null;
 }

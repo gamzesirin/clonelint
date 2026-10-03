@@ -15,10 +15,36 @@ const LOCKFILES = [
 
 // Files each package manager rewrites on every install.
 const INSTALL_MARKERS = {
-  npm: 'node_modules/.package-lock.json',
-  pnpm: 'node_modules/.modules.yaml',
-  yarn: 'node_modules/.yarn-integrity',
+  npm: ['node_modules/.package-lock.json'],
+  pnpm: ['node_modules/.modules.yaml'],
+  // Yarn 1, then Yarn 2+ with the node-modules linker.
+  yarn: ['node_modules/.yarn-integrity', 'node_modules/.yarn-state.yml'],
 };
+
+const pinnedManager = (pkg) =>
+  typeof pkg?.packageManager === 'string' ? pkg.packageManager.match(/^(npm|pnpm|yarn|bun)@(\d[^+\s]*)/) : null;
+
+// The project directory and its parents up to the repository root. Outside a
+// repository only the project itself, so stray files further up are ignored.
+function repoDirs(cwd) {
+  const dirs = [];
+  for (let dir = cwd; ; dir = path.dirname(dir)) {
+    dirs.push(dir);
+    if (fs.existsSync(path.join(dir, '.git'))) return dirs;
+    if (path.dirname(dir) === dir) return [cwd];
+  }
+}
+
+// Nearest directory that says which package manager is used: the project
+// itself, or the workspace root when this is a package inside a monorepo.
+function installRoot(ctx, pkg) {
+  for (const dir of repoDirs(ctx.cwd)) {
+    const locks = LOCKFILES.filter(([file]) => fs.existsSync(path.join(dir, file)));
+    const pinned = pinnedManager(dir === ctx.cwd ? pkg : ctx.json(path.relative(ctx.cwd, path.join(dir, 'package.json'))));
+    if (locks.length || pinned) return { dir, locks, pinned };
+  }
+  return { dir: ctx.cwd, locks: [], pinned: null };
+}
 
 // Looks in parent directories too, so hoisted monorepo installs count.
 function hasModule(cwd, name) {
@@ -33,9 +59,9 @@ function checkNode(ctx) {
   if (!pkg) return [];
   const results = [];
 
-  const locks = LOCKFILES.filter(([file]) => ctx.exists(file));
+  const { dir: root, locks, pinned } = installRoot(ctx, pkg);
+  const inRoot = (file) => path.relative(ctx.cwd, path.join(root, file));
   const managers = [...new Set(locks.map(([, manager]) => manager))];
-  const pinned = typeof pkg.packageManager === 'string' ? pkg.packageManager.match(/^(npm|pnpm|yarn|bun)@(\d[^+\s]*)/) : null;
   const pm = pinned?.[1] ?? managers[0] ?? 'npm';
   const install = `${pm} install`;
 
@@ -65,7 +91,7 @@ function checkNode(ctx) {
 
   const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
   if (!deps.length) return results;
-  if (ctx.exists('.pnp.cjs')) {
+  if (ctx.exists(inRoot('.pnp.cjs'))) {
     results.push(ok("Dependencies are installed (Yarn Plug'n'Play)"));
     return results;
   }
@@ -74,13 +100,13 @@ function checkNode(ctx) {
   const hint = `Run \`${install}\`.`;
   const missing = deps.filter((name) => !hasModule(ctx.cwd, name));
   const lockfile = locks.find(([, manager]) => manager === pm)?.[0];
-  const installedAt = INSTALL_MARKERS[pm] && ctx.mtime(INSTALL_MARKERS[pm]);
+  const installedAt = (INSTALL_MARKERS[pm] ?? []).map((file) => ctx.mtime(inRoot(file))).find(Boolean);
 
   if (missing.length === deps.length) {
     results.push(fail(`Dependencies are not installed (${deps.length} packages missing from node_modules)`, hint, fix));
   } else if (missing.length) {
     results.push(fail(`${missing.length} of ${deps.length} dependencies are missing from node_modules: ${list(missing)}`, hint, fix));
-  } else if (lockfile && installedAt && ctx.mtime(lockfile) > installedAt + 1000) {
+  } else if (lockfile && installedAt && ctx.mtime(inRoot(lockfile)) > installedAt + 1000) {
     results.push(warn(`${lockfile} changed since the last install; node_modules may be out of date`, hint, fix));
   } else {
     results.push(ok(`All ${deps.length} direct dependencies are installed (${pm})`));
@@ -98,12 +124,14 @@ function checkComposer(ctx) {
     if (ctx.exists('vendor/autoload.php')) {
       results.push(ok('Composer dependencies are installed'));
     } else {
-      results.push(
-        fail('Composer dependencies are not installed (vendor/autoload.php is missing)', 'Run `composer install`.', {
-          label: 'composer install',
-          run: () => runVisible('composer install', ctx.cwd),
-        }),
-      );
+      const message = 'Composer dependencies are not installed (vendor/autoload.php is missing)';
+      // A composer.phar kept in the project is used when there is no global Composer.
+      const install = run('composer --version').ok ? 'composer install' : ctx.exists('composer.phar') ? 'php composer.phar install' : null;
+      if (install) {
+        results.push(fail(message, `Run \`${install}\`.`, { label: install, run: () => runVisible(install, ctx.cwd) }));
+      } else {
+        results.push(fail(message, 'Install Composer (getcomposer.org), then run `composer install`.'));
+      }
     }
   }
 
