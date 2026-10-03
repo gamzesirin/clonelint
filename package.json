@@ -1,0 +1,31 @@
+{
+  "name": "clonelint",
+  "version": "0.1.0",
+  "description": "One command to find out why a freshly cloned repo doesn't run on your machine: runtime versions, dependencies, .env keys, ports, services.",
+  "type": "module",
+  "bin": {
+    "clonelint": "bin/clonelint.js"
+  },
+  "exports": "./src/index.js",
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.3"
+  },
+  "keywords": [
+    "doctor",
+    "onboarding",
+    "developer-experience",
+    "dotenv",
+    "environment",
+    "preflight",
+    "cli"
+  ],
+  "author": "Gamze Şirin",
+  "license": "MIT"
+}
