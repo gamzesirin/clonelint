@@ -58,16 +58,25 @@ Exit code is `0` when healthy, `1` when something failed, `2` on a usage error.
 
 | Check | Detected from | Reports |
 | --- | --- | --- |
-| `runtimes` | `.nvmrc`, `.node-version`, `.tool-versions`, `engines.node`, `volta`, `.python-version`, `requires-python`, `runtime.txt`, `composer.json` `require.php`, `go.mod`, `.ruby-version` | Runtime missing or the wrong version |
+| `runtimes` | `.nvmrc`, `.node-version`, `.tool-versions`, `engines.node`, `volta`, `.python-version`, `requires-python`, Poetry's `python` constraint, `runtime.txt`, `composer.json` `require.php`, `go.mod`, `.ruby-version` | Runtime missing or the wrong version |
 | `dependencies` | `package.json` + lockfiles, `composer.json`, `pyproject.toml` / `requirements.txt` / `Pipfile` | Package manager missing, packages not installed, stale `node_modules`, several lockfiles, disabled PHP extensions, no virtualenv |
 | `env` | `.env.example` (or `.sample`, `.template`, `.dist`) against `.env`, `.env.local`, ... | `.env` missing, variables missing or left empty |
-| `ports` | `PORT`, `APP_PORT`, `VITE_PORT`, ... | Port already taken, and by which process |
+| `ports` | `PORT`, `APP_PORT`, `VITE_PORT`, ... | Port already taken, and by which process (`lsof` or `ss`; `netstat` on Windows) |
 | `services` | Compose files, connection strings (`DATABASE_URL`, `REDIS_URL`, ...), `X_HOST` / `X_PORT` pairs | Docker not running, database or cache not reachable |
 | `git` | `.gitmodules`, `.gitattributes`, `.husky` | Submodules not checked out, git-lfs missing, hooks not installed |
 | `custom` | your config, see below | Anything specific to your project |
 
 Checks that don't apply to a project are skipped silently. Secrets are never
 printed: for connection strings only the host and port appear in the report.
+
+`.tool-versions` is read for `nodejs` / `node`, `python`, `php`, `golang` / `go`
+and `ruby`. Inside a monorepo package the package manager comes from the nearest
+lockfile or `packageManager` field between the package and the repository root.
+
+A `package.json`, `composer.json` or `.clonelint.json` that is not valid JSON
+can't be checked, so it is reported as a failure in a separate **Project files**
+group at the top of the report (`files` in the JSON output). That group is not a
+check: `--only` and `--skip` don't affect it.
 
 ## Project configuration (optional)
 
@@ -90,6 +99,9 @@ Add `.clonelint.json` to the repo, or a `"clonelint"` key to `package.json`:
 - `ports`: extra ports that must be free.
 - `services`: extra `host:port` endpoints that must be reachable.
 - `ignore`: checks to skip for this project.
+
+Each of these also accepts a single value instead of a list: `"ports": 5173`,
+`"ignore": "git"`.
 
 Commands in `checks` are run on the machine of whoever runs clonelint, like
 npm scripts. Use `--no-custom` on a repo you don't trust yet.
