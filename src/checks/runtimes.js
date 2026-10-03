@@ -51,6 +51,7 @@ const RUNTIMES = [
     name: 'Python',
     pinPrecision: 2,
     looseTilde: true,
+    exactBounds: true,
     installed: () => installedVersion(['python3 --version', 'python --version', 'py --version']),
     requirements(ctx) {
       return [
@@ -68,6 +69,7 @@ const RUNTIMES = [
     name: 'PHP',
     pinPrecision: 2,
     looseTilde: true,
+    exactBounds: true,
     installed: () => installedVersion(['php -v']),
     requirements(ctx) {
       return [
@@ -91,6 +93,7 @@ const RUNTIMES = [
     name: 'Ruby',
     pinPrecision: 2,
     looseTilde: true,
+    exactBounds: true,
     installed: () => installedVersion(['ruby -v']),
     requirements(ctx) {
       return [
@@ -104,7 +107,7 @@ const RUNTIMES = [
 
 function evaluate(runtime, installed, req) {
   const label = `${runtime.name} ${installed}`;
-  const verdict = satisfies(installed, req.spec, { looseTilde: req.looseTilde ?? runtime.looseTilde });
+  const verdict = satisfies(installed, req.spec, { looseTilde: req.looseTilde ?? runtime.looseTilde, exactBounds: runtime.exactBounds });
   if (verdict === null) {
     return warn(`${label} installed; cannot interpret "${req.spec}" from ${req.source}`);
   }

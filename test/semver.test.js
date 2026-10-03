@@ -41,4 +41,9 @@ test('composer and python ranges', () => {
   assert.equal(satisfies('3.13.0', '>=3.9, <3.13'), false);
   assert.equal(satisfies('3.12.1', '~=3.10'), true);
   assert.equal(satisfies('3.11.2', '==3.11.*'), true);
+  // npm treats a short version as a range, the others pad it with zeros.
+  assert.equal(satisfies('3.12.4', '<=3.12'), true);
+  assert.equal(satisfies('3.12.4', '<=3.12', { exactBounds: true }), false);
+  assert.equal(satisfies('3.12.4', '>3.12'), false);
+  assert.equal(satisfies('3.12.4', '>3.12', { exactBounds: true }), true);
 });

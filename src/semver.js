@@ -19,7 +19,7 @@ function parsePartial(text) {
   return parts;
 }
 
-function testComparator(version, comparator, looseTilde) {
+function testComparator(version, comparator, { looseTilde, exactBounds }) {
   const m = comparator.match(/^(~=|~>|~|>=|<=|>|<|===|==|=|!=|\^)?v?(.+)$/);
   if (!m) return null;
   const op = m[1] ?? '';
@@ -37,12 +37,14 @@ function testComparator(version, comparator, looseTilde) {
   switch (op) {
     case '>=':
       return cmp(version, lower) >= 0;
+    // npm reads >1.2 as >=1.3.0 and <=1.2 as <1.3.0; Composer, Python and
+    // Ruby pad with zeros instead (exactBounds): >1.2.0 and <=1.2.0.
     case '>':
-      return upper ? cmp(version, upper) >= 0 : cmp(version, lower) > 0;
+      return upper && !exactBounds ? cmp(version, upper) >= 0 : cmp(version, lower) > 0;
     case '<':
       return cmp(version, lower) < 0;
     case '<=':
-      return upper ? cmp(version, upper) < 0 : cmp(version, lower) <= 0;
+      return upper && !exactBounds ? cmp(version, upper) < 0 : cmp(version, lower) <= 0;
     case '^':
       if (major > 0 || minor === null) return within([major + 1, 0, 0]);
       if (minor > 0 || patch === null) return within([0, minor + 1, 0]);
@@ -61,10 +63,10 @@ function testComparator(version, comparator, looseTilde) {
 /**
  * @param {string} version installed version
  * @param {string} range   required range
- * @param {{ looseTilde?: boolean }} [options]
+ * @param {{ looseTilde?: boolean, exactBounds?: boolean }} [options]
  * @returns {boolean | null} null when the range cannot be interpreted
  */
-export function satisfies(version, range, { looseTilde = false } = {}) {
+export function satisfies(version, range, { looseTilde = false, exactBounds = false } = {}) {
   const v = parseVersion(version);
   if (!v) return null;
   const normalized = String(range)
@@ -77,7 +79,7 @@ export function satisfies(version, range, { looseTilde = false } = {}) {
   for (const alternative of normalized.split(/\s*\|\|?\s*/)) {
     const comparators = alternative.split(/[\s,]+/).filter(Boolean);
     if (!comparators.length) continue;
-    const verdicts = comparators.map((c) => testComparator(v, c, looseTilde));
+    const verdicts = comparators.map((c) => testComparator(v, c, { looseTilde, exactBounds }));
     if (verdicts.includes(null)) unknown = true;
     else if (verdicts.every(Boolean)) return true;
   }

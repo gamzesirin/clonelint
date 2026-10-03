@@ -15,10 +15,11 @@ const LOCKFILES = [
 
 // Files each package manager rewrites on every install.
 const INSTALL_MARKERS = {
-  npm: ['node_modules/.package-lock.json'],
-  pnpm: ['node_modules/.modules.yaml'],
-  // Yarn 1, then Yarn 2+ with the node-modules linker.
-  yarn: ['node_modules/.yarn-integrity', 'node_modules/.yarn-state.yml'],
+  npm: 'node_modules/.package-lock.json',
+  pnpm: 'node_modules/.modules.yaml',
+  // Yarn 1 only. Yarn 2+ leaves .yarn-state.yml untouched when nothing had to
+  // be installed, so its age says nothing about the lockfile.
+  yarn: 'node_modules/.yarn-integrity',
 };
 
 const pinnedManager = (pkg) =>
@@ -100,13 +101,16 @@ function checkNode(ctx) {
   const hint = `Run \`${install}\`.`;
   const missing = deps.filter((name) => !hasModule(ctx.cwd, name));
   const lockfile = locks.find(([, manager]) => manager === pm)?.[0];
-  const installedAt = (INSTALL_MARKERS[pm] ?? []).map((file) => ctx.mtime(inRoot(file))).find(Boolean);
+  const installedAt = INSTALL_MARKERS[pm] && ctx.mtime(inRoot(INSTALL_MARKERS[pm]));
+  // Yarn 1 does not rewrite its marker when everything was already up to date,
+  // so an older marker alone proves nothing; ask yarn itself.
+  const inSync = () => pm === 'yarn' && run('yarn check --integrity', { cwd: ctx.cwd, timeout: 30000 }).ok;
 
   if (missing.length === deps.length) {
     results.push(fail(`Dependencies are not installed (${deps.length} packages missing from node_modules)`, hint, fix));
   } else if (missing.length) {
     results.push(fail(`${missing.length} of ${deps.length} dependencies are missing from node_modules: ${list(missing)}`, hint, fix));
-  } else if (lockfile && installedAt && ctx.mtime(inRoot(lockfile)) > installedAt + 1000) {
+  } else if (lockfile && installedAt && ctx.mtime(inRoot(lockfile)) > installedAt + 1000 && !inSync()) {
     results.push(warn(`${lockfile} changed since the last install; node_modules may be out of date`, hint, fix));
   } else {
     results.push(ok(`All ${deps.length} direct dependencies are installed (${pm})`));
