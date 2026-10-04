@@ -106,6 +106,10 @@ Each of these also accepts a single value instead of a list: `"ports": 5173`,
 Commands in `checks` are run on the machine of whoever runs clonelint, like
 npm scripts. Use `--no-custom` on a repo you don't trust yet.
 
+On Windows, commands are looked up on `PATH` only, never in the project
+directory, so a repo can't shadow `npm` or `git` with its own `npm.cmd`. To run
+a script that lives in the repo, write its path: `.\scripts\check.bat`.
+
 ## For teams
 
 Put it in the README of your project as the first thing to run after cloning,
