@@ -23,7 +23,6 @@ function testComparator(version, comparator, { looseTilde, exactBounds }) {
   const m = comparator.match(/^(~=|~>|~|>=|<=|>|<|===|==|=|!=|\^)?v?(.+)$/);
   if (!m) return null;
   const op = m[1] ?? '';
-  if (op === '!=') return true;
   const partial = parsePartial(m[2]);
   if (!partial) return null;
   const [major, minor, patch] = partial;
@@ -55,6 +54,9 @@ function testComparator(version, comparator, { looseTilde, exactBounds }) {
       // npm: ~1.2 → <1.3. Composer/Python/Ruby: ~1.2 → <2.0.
       if (minor === null || (patch === null && (looseTilde || op !== '~'))) return within([major + 1, 0, 0]);
       return within([major, minor + 1, 0]);
+    case '!=':
+      // PEP 440 pads !=3.10 with zeros; only !=3.10.* excludes the whole series.
+      return !(upper && (!exactBounds || /[xX*]/.test(m[2])) ? within(upper) : cmp(version, lower) === 0);
     default:
       return upper ? within(upper) : cmp(version, lower) === 0;
   }

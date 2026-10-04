@@ -30,6 +30,11 @@ export function parseDotenv(text) {
         last++;
         body += `\n${lines[last]}`;
         end = closingQuote(body, quote);
+        // A quote in the middle of a later line opens that line's own value.
+        if (end !== -1 && !/^\s*(#.*)?$/.test(body.slice(end + 1))) {
+          end = -1;
+          break;
+        }
       }
       if (end === -1) {
         // The quote is never closed: keep the value on its own line instead

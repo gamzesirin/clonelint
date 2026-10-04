@@ -107,7 +107,7 @@ function checkNode(ctx) {
   const inSync = () => pm === 'yarn' && run('yarn check --integrity', { cwd: ctx.cwd, timeout: 30000 }).ok;
 
   if (missing.length === deps.length) {
-    results.push(fail(`Dependencies are not installed (${deps.length} packages missing from node_modules)`, hint, fix));
+    results.push(fail(`Dependencies are not installed (${deps.length} package${deps.length === 1 ? '' : 's'} missing from node_modules)`, hint, fix));
   } else if (missing.length) {
     results.push(fail(`${missing.length} of ${deps.length} dependencies are missing from node_modules: ${list(missing)}`, hint, fix));
   } else if (lockfile && installedAt && ctx.mtime(inRoot(lockfile)) > installedAt + 1000 && !inSync()) {

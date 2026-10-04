@@ -26,7 +26,14 @@ function poetryPython(ctx) {
 // A "pin" names one version (.nvmrc); a "range" is a constraint (engines).
 // Versions are sometimes written as JSON numbers ("node": 20).
 const text = (spec) => (typeof spec === 'string' || typeof spec === 'number' ? String(spec).trim() : '');
-const pin = (spec, source) => (text(spec) ? [{ spec: text(spec).split(/\s+/)[0], source, kind: 'pin' }] : []);
+// Version files may carry comments (nvm allows "#" in .nvmrc).
+const firstToken = (spec) =>
+  text(spec)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*$/, '').trim())
+    .find(Boolean)
+    ?.split(/\s+/)[0] ?? '';
+const pin = (spec, source) => (firstToken(spec) ? [{ spec: firstToken(spec), source, kind: 'pin' }] : []);
 const range = (spec, source) => (text(spec) ? [{ spec: text(spec), source, kind: 'range' }] : []);
 
 const RUNTIMES = [

@@ -47,3 +47,11 @@ test('composer and python ranges', () => {
   assert.equal(satisfies('3.12.4', '>3.12'), false);
   assert.equal(satisfies('3.12.4', '>3.12', { exactBounds: true }), true);
 });
+
+test('exclusions', () => {
+  assert.equal(satisfies('3.10.2', '>=3.9, !=3.10.*', { exactBounds: true }), false);
+  assert.equal(satisfies('3.11.4', '>=3.9, !=3.10.*', { exactBounds: true }), true);
+  assert.equal(satisfies('3.10.2', '>=3.9, !=3.10', { exactBounds: true }), true);
+  assert.equal(satisfies('3.10.0', '>=3.9, !=3.10', { exactBounds: true }), false);
+  assert.equal(satisfies('8.2.4', '>=8.1, !=8.2.4', { exactBounds: true }), false);
+});

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 
-const env = { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' };
+// cmd.exe looks in the current directory before PATH, so a repository could
+// ship its own npm.cmd or git.bat; this variable turns that lookup off.
+const env = { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0', NoDefaultCurrentDirectoryInExePath: '1' };
 
 /** Run a shell command quietly and capture its output. Never throws. */
 export function run(command, { cwd, timeout = 8000 } = {}) {

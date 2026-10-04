@@ -188,3 +188,36 @@ test('parseSs reads the owner of a listening port', () => {
   assert.equal(parseSs('LISTEN 0 511 *:3000 *:*'), null);
   assert.equal(parseSs(''), null);
 });
+
+test('a quote opening a later value does not close an unterminated one', () => {
+  const vars = parseDotenv("A='it\nB=2\nC='x'\nD=4\n");
+  assert.deepEqual([...vars.keys()], ['A', 'B', 'C', 'D']);
+  assert.equal(vars.get('C').value, 'x');
+});
+
+test('a malformed custom check does not take the others down with it', async () => {
+  const dir = project({ '.clonelint.json': { checks: [{ command: 123 }, { name: 'node runs', command: 'node --version' }] } });
+  assert.deepEqual(results(await diagnose(dir), 'custom').map((r) => r.status), ['warn', 'ok']);
+});
+
+test('comments in version files are skipped', async () => {
+  const major = process.versions.node.split('.')[0];
+  const report = await diagnose(project({ '.nvmrc': `# our version\n${major} # LTS\n` }), { only: ['runtimes'] });
+  assert.equal(results(report, 'runtimes')[0].status, 'ok');
+});
+
+test('a URL in X_HOST is reduced to its hostname', async () => {
+  const dir = project({ '.env.example': 'ELASTIC_HOST=http://localhost:1\nELASTIC_PORT=1\n' });
+  const [elastic] = results(await diagnose(dir, { only: ['services'] }), 'services');
+  assert.match(elastic.message, /on localhost:1 \(ELASTIC_HOST\)/);
+});
+
+test('commands are not resolved from the project directory on Windows', async (t) => {
+  if (process.platform !== 'win32') return t.skip('cmd.exe only');
+  const dir = project({
+    'package.json': { dependencies: { 'clonelint-fake-a': '1.0.0' } },
+    'npm.cmd': '@echo off\r\necho ran> hijacked.txt\r\necho 10.0.0\r\n',
+  });
+  await diagnose(dir, { only: ['dependencies'], custom: false });
+  assert.equal(fs.existsSync(path.join(dir, 'hijacked.txt')), false);
+});

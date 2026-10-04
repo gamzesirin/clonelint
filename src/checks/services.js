@@ -51,7 +51,16 @@ function collectEndpoints(ctx) {
     const prefix = key.match(/^(.+)_HOST$/)?.[1];
     if (!prefix || APP_PREFIXES.has(prefix)) continue;
     if (prefix === 'DB' && /sqlite/i.test(values.get('DB_CONNECTION') ?? '')) continue;
-    add(value, Number(values.get(`${prefix}_PORT`)), `${prefix}_HOST`, prefix === 'DB');
+    // Some projects put a whole URL in X_HOST (http://localhost:9200).
+    let host = value;
+    if (scheme) {
+      try {
+        host = new URL(value).hostname.replace(/^\[|\]$/g, '');
+      } catch {
+        continue;
+      }
+    }
+    add(host, Number(values.get(`${prefix}_PORT`)), `${prefix}_HOST`, prefix === 'DB');
   }
 
   for (const service of toArray(ctx.config.services)) {
