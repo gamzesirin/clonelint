@@ -134,6 +134,12 @@ const report = await diagnose(process.cwd(), { skip: ['ports'] });
 // { project, cwd, groups: [{ id, title, results: [{ status, message, hint }] }], summary }
 ```
 
+## Documentation
+
+- [Checks](docs/checks.md): what each check looks at and when it passes, warns or fails
+- [API and JSON output](docs/api.md): `diagnose()`, `applyFixes()`, the report format, exit codes
+- [Architecture](docs/architecture.md): how the code is organised and how to add a check
+
 ## Development
 
 ```sh
