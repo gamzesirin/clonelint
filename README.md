@@ -1,4 +1,6 @@
 # clonelint
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/0b22fd96-c96d-42a4-a98d-f6bf7628d3bc" />
+
 
 [![npm](https://img.shields.io/npm/v/clonelint)](https://www.npmjs.com/package/clonelint)
 [![CI](https://github.com/gamzesirin/clonelint/actions/workflows/ci.yml/badge.svg)](https://github.com/gamzesirin/clonelint/actions/workflows/ci.yml)
