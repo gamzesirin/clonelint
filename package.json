@@ -27,5 +27,13 @@
     "cli"
   ],
   "author": "Gamze Şirin",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gamzesirin/clonelint.git"
+  },
+  "homepage": "https://github.com/gamzesirin/clonelint#readme",
+  "bugs": {
+    "url": "https://github.com/gamzesirin/clonelint/issues"
+  }
 }
