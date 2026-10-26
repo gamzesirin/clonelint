@@ -135,6 +135,11 @@ test('invalid JSON project files are reported instead of ignored', async () => {
   assert.match(results(report, 'files')[0].message, /package\.json/);
 });
 
+test('an invalid composer.json is reported even when no check reads it', async () => {
+  const report = await diagnose(project({ 'composer.json': '{bad' }), { only: ['env'] });
+  assert.match(results(report, 'files')[0]?.message ?? '', /composer\.json/);
+});
+
 test('loosely typed config values do not crash a check', async () => {
   const dir = project({
     'package.json': { volta: { node: 1 }, engines: { node: 1 } },

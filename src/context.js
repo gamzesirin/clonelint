@@ -35,6 +35,8 @@ export function createContext(cwd) {
   };
 
   const pkg = json('package.json');
+  // Parsed up front so a broken file is reported whatever --only/--skip select.
+  json('composer.json');
   const declared = json(CONFIG_FILE) ?? pkg?.clonelint;
   const config = declared && typeof declared === 'object' && !Array.isArray(declared) ? declared : {};
 

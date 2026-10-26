@@ -78,7 +78,8 @@ no recognised project files.
 ## `--json`
 
 The same report on stdout, with two differences: `fix` is replaced by a
-`fixable` boolean on every result, and with `--fix` an `applied` list is added.
+`fixable` boolean on every result, and with `--fix` an `applied` list is added
+when there was something to fix.
 
 ```json
 {
