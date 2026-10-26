@@ -1,5 +1,8 @@
 # clonelint
 
+[![npm](https://img.shields.io/npm/v/clonelint)](https://www.npmjs.com/package/clonelint)
+[![CI](https://github.com/gamzesirin/clonelint/actions/workflows/ci.yml/badge.svg)](https://github.com/gamzesirin/clonelint/actions/workflows/ci.yml)
+
 One command to find out why a freshly cloned repo doesn't run on your machine.
 
 ```
@@ -51,6 +54,7 @@ npx clonelint --fix        # apply the safe fixes, then check again
 | `--strict` | Exit with code 1 on warnings too. |
 | `--only <ids>` / `--skip <ids>` | Comma separated list of checks to run or skip. |
 | `--no-custom` | Do not run commands from the project's clonelint config. |
+| `-v`, `--version` / `-h`, `--help` | Print the version or the help. |
 
 Exit code is `0` when healthy, `1` when something failed, `2` on a usage error.
 
@@ -60,7 +64,7 @@ Exit code is `0` when healthy, `1` when something failed, `2` on a usage error.
 | --- | --- | --- |
 | `runtimes` | `.nvmrc`, `.node-version`, `.tool-versions`, `engines.node`, `volta`, `.python-version`, `requires-python`, Poetry's `python` constraint, `runtime.txt`, `composer.json` `require.php`, `go.mod`, `.ruby-version` | Runtime missing or the wrong version |
 | `dependencies` | `package.json` + lockfiles, `composer.json`, `pyproject.toml` / `requirements.txt` / `Pipfile` | Package manager missing, packages not installed, stale `node_modules`, several lockfiles, disabled PHP extensions, no virtualenv |
-| `env` | `.env.example` (or `.sample`, `.template`, `.dist`) against `.env`, `.env.local`, ... | `.env` missing, variables missing or left empty |
+| `env` | `.env.example` (or `.sample`, `.template`, `.dist`, `.env.local.example`) against `.env`, `.env.local`, ... | `.env` missing, variables missing or left empty |
 | `ports` | `PORT`, `APP_PORT`, `VITE_PORT`, ... | Port already taken, and by which process (`lsof` or `ss`; `netstat` on Windows) |
 | `services` | Compose files, connection strings (`DATABASE_URL`, `REDIS_URL`, ...), `X_HOST` / `X_PORT` pairs | Docker not running, database or cache not reachable |
 | `git` | `.gitmodules`, `.gitattributes`, `.husky` | Submodules not checked out, git-lfs missing, hooks not installed |
@@ -113,16 +117,22 @@ a script that lives in the repo, write its path: `.\scripts\check.bat`.
 ## For teams
 
 Put it in the README of your project as the first thing to run after cloning,
-or wire it into the scripts:
+or add it as a dev dependency and wire it into the scripts:
+
+```sh
+npm install --save-dev clonelint
+```
 
 ```json
 { "scripts": { "doctor": "clonelint", "predev": "clonelint --only runtimes,dependencies,env" } }
 ```
 
-In CI it catches a `.env.example` or version file that has drifted:
+In CI, run it after installing dependencies to catch a version file, lockfile or
+`package.json` that has drifted. CI machines usually have no `.env`, so skip
+that check along with the ones that depend on the local machine:
 
 ```yaml
-- run: npx clonelint --skip ports,services
+- run: npx clonelint --skip env,ports,services
 ```
 
 ## API
